@@ -28,11 +28,12 @@ package main
 import (
 	"fmt"
 	"testing"
+	"encoding/json"
 
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 )
 
-func checkInvoke(t *testing, stub *shim.MockStub, args [][]byte) {
+func checkInvoke(t *testing.T, stub *shim.MockStub, args [][]byte) {
 
 	res := stub.MockInvoke("1",args)
 	if res.Status != shim.OK {
@@ -41,7 +42,7 @@ func checkInvoke(t *testing, stub *shim.MockStub, args [][]byte) {
 	}
 }
 
-func checkHome(t *testing, stub *shim.MockStub, string id, string name) {
+func checkHome(t *testing.T, stub *shim.MockStub, id string, name string ) {
 
 	res := stub.MockInvoke("1",[][]byte{[]byte("queryHome"), []byte(id)})
 	if res.Status != shim.OK {
@@ -52,7 +53,7 @@ func checkHome(t *testing, stub *shim.MockStub, string id, string name) {
 		fmt.Println("QueryHome", id, "failed to get value")
 		t.FailNow()
 	}
-  homeAsBytes, _ := res.Payload
+  	homeAsBytes := res.Payload
 	home := SmartHome{}
 
 	json.Unmarshal(homeAsBytes, &home)
@@ -63,12 +64,12 @@ func checkHome(t *testing, stub *shim.MockStub, string id, string name) {
 
 }
 
-func testQueryHome(t *testing.T) {
+func TestQueryHome(t *testing.T) {
 
 	scc := new(SmartHome)
-	stub = shim.NewMockStub("ex01",scc)
+	stub := shim.NewMockStub("ex01",scc)
 
 	checkInvoke(t, stub, [][]byte{[]byte("initLedger")})
-	checkHome(t, stub, "HOME1", "101")
+	checkHome(t, stub, "1", "101")
 
 }
