@@ -31,15 +31,23 @@ import (
 	"encoding/json"
 
 	"github.com/hyperledger/fabric/core/chaincode/shim"
+	 sc "github.com/hyperledger/fabric/protos/peer"
 )
 
-func checkInvoke(t *testing.T, stub *shim.MockStub, args [][]byte) {
+type QueryResults struct {
+		Key string
+		Record SmartHome
+}
+
+func checkInvoke(t *testing.T, stub *shim.MockStub, args [][]byte) sc.Response{
 
 	res := stub.MockInvoke("1",args)
 	if res.Status != shim.OK {
 		fmt.Println("Invoke", args, "failed", string(res.Message))
 		t.FailNow()
 	}
+
+	return res
 }
 
 func checkHome(t *testing.T, stub *shim.MockStub, id string, name string ) {
@@ -53,12 +61,14 @@ func checkHome(t *testing.T, stub *shim.MockStub, id string, name string ) {
 		fmt.Println("QueryHome", id, "failed to get value")
 		t.FailNow()
 	}
-  	homeAsBytes := res.Payload
+
+  homeAsBytes := res.Payload
 	home := SmartHome{}
 
 	json.Unmarshal(homeAsBytes, &home)
-	if home.name != name {
-		fmt.Println("QueryHome", id, "expecting name: ", name, " but found: ", home.name)
+
+	if home.Name != name {
+		fmt.Println("QueryHome", id, "expecting name: ", name, " but found: ", home.Name)
 		t.FailNow()
 	}
 
@@ -70,6 +80,62 @@ func TestQueryHome(t *testing.T) {
 	stub := shim.NewMockStub("ex01",scc)
 
 	checkInvoke(t, stub, [][]byte{[]byte("initLedger")})
-	checkHome(t, stub, "1", "101")
+	checkHome(t, stub, "HOME0", "101")
 
+}
+
+func TestCreateHome(t *testing.T) {
+
+	scc := new(SmartHome)
+	stub := shim.NewMockStub("ex01",scc)
+
+	checkInvoke(t, stub, [][]byte{[]byte("createHome"), []byte("TESTHOME"), []byte("301"), []byte("3"), []byte("0"), []byte("customer.301@example.com")})
+	checkHome(t, stub, "TESTHOME", "301")
+
+}
+
+func TestQueryAllHomes(t *testing.T) {
+
+	scc := new(SmartHome)
+	stub := shim.NewMockStub("ex01",scc)
+  allhomesbytes :=make([]QueryResults,0)
+  checkInvoke(t, stub, [][]byte{[]byte("initLedger")})
+	all_homes:=checkInvoke(t, stub, [][]byte{[]byte("queryAllHomes")})
+	fmt.Sprintf("Return payload is %s ", all_homes.Payload)
+	json.Unmarshal(all_homes.Payload, &allhomesbytes)
+
+  num_of_homes := len(allhomesbytes)
+	fmt.Println("Number of records Found ", num_of_homes)
+	if num_of_homes < 8 {
+		fmt.Println("Expected more number of rows")
+		t.FailNow()
+	}
+
+	i := 0
+	//allhomes := make([]SmartHome,num_of_homes)
+	for i < num_of_homes {
+		fmt.Println("Key val ", allhomesbytes[i].Key)
+		//json.Unmarshal(allhomesbytes[i].Record,&allhomes[i])
+		fmt.Println("Found ", allhomesbytes[i].Record)
+		i = i + 1
+	}
+}
+
+func TestChangeHomeOwnership(t *testing.T) {
+
+	scc := new(SmartHome)
+	stub := shim.NewMockStub("ex01",scc)
+
+	checkInvoke(t, stub, [][]byte{[]byte("changeHomeOwnership"), []byte("HOME0"), []byte("80"), []byte("20")})
+	res := checkInvoke(t, stub, [][]byte{[]byte("queryHome"), []byte("HOME0")})
+
+	homeAsBytes := res.Payload
+	home := SmartHome{}
+
+	json.Unmarshal(homeAsBytes, &home)
+
+	if home.BuilderPerc != 80 {
+		fmt.Println("Incorrect percentage ")
+		t.FailNow()
+	}
 }

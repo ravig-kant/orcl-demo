@@ -44,14 +44,14 @@ type SmartContract struct {
 
 // Define the SmartHome structure, with 4 properties.  Structure tags are used by encoding/json library
 type SmartHome struct {
-		name   string `json:"name"`
-    tower  int `json:"tower"`
-    floor int `json:"floor"`
-    completedFloor  int `json:"completedFloor"`
-		buildStatus	int	`json:"buildStatus"`
-		builderPerc	int	`json:"builderPerc"`
-		customerPerc	int	`json:"customerPerc"`
-		customer	string	`json:"customer"`
+		Name   string `json:"name"`
+    Tower  int `json:"tower"`
+    Floor int `json:"floor"`
+    CompletedFloor  int `json:"completedFloor"`
+		BuildStatus	int	`json:"buildStatus"`
+		BuilderPerc	int	`json:"builderPerc"`
+		CustomerPerc	int	`json:"customerPerc"`
+		Customer	string	`json:"customer"`
 }
 
 /*
@@ -98,20 +98,24 @@ func (s *SmartHome) queryHome(APIstub shim.ChaincodeStubInterface, args []string
 
 func (s *SmartHome) initLedger(APIstub shim.ChaincodeStubInterface) sc.Response {
 	homes := []SmartHome{
-		SmartHome{name: "101", tower: 1, floor: 0, completedFloor: 0, buildStatus: 0, builderPerc: 100, customerPerc: 0, customer: "customer.101@example.com"},
-		SmartHome{name: "102", tower: 1, floor: 0, completedFloor: 0, buildStatus: 0, builderPerc: 100, customerPerc: 0, customer: "customer.102@example.com"},
-		SmartHome{name: "103", tower: 1, floor: 0, completedFloor: 0, buildStatus: 0, builderPerc: 100, customerPerc: 0, customer: "customer.103@example.com"},
-		SmartHome{name: "104", tower: 1, floor: 0, completedFloor: 0, buildStatus: 0, builderPerc: 100, customerPerc: 0, customer: "customer.104@example.com"},
-		SmartHome{name: "201", tower: 2, floor: 0, completedFloor: 1, buildStatus: 1, builderPerc: 80, customerPerc: 20, customer: "customer.201@example.com"},
-		SmartHome{name: "202", tower: 2, floor: 0, completedFloor: 1, buildStatus: 1, builderPerc: 80, customerPerc: 20, customer: "customer.202@example.com"},
-		SmartHome{name: "203", tower: 2, floor: 0, completedFloor: 1, buildStatus: 1, builderPerc: 80, customerPerc: 20, customer: "customer.203@example.com"},
-		SmartHome{name: "204", tower: 2, floor: 0, completedFloor: 1, buildStatus: 1, builderPerc: 80, customerPerc: 20, customer: "customer.204@example.com"},
+		SmartHome{Name: "101", Tower: 1, Floor: 0, CompletedFloor: 0, BuildStatus: 0, BuilderPerc: 100, CustomerPerc: 0, Customer: "customer.101@example.com"},
+		SmartHome{Name: "102", Tower: 1, Floor: 0, CompletedFloor: 0, BuildStatus: 0, BuilderPerc: 100, CustomerPerc: 0, Customer: "customer.102@example.com"},
+		SmartHome{Name: "103", Tower: 1, Floor: 0, CompletedFloor: 0, BuildStatus: 0, BuilderPerc: 100, CustomerPerc: 0, Customer: "customer.103@example.com"},
+		SmartHome{Name: "104", Tower: 1, Floor: 0, CompletedFloor: 0, BuildStatus: 0, BuilderPerc: 100, CustomerPerc: 0, Customer: "customer.104@example.com"},
+		SmartHome{Name: "201", Tower: 2, Floor: 0, CompletedFloor: 1, BuildStatus: 1, BuilderPerc: 80, CustomerPerc: 20, Customer: "customer.201@example.com"},
+		SmartHome{Name: "202", Tower: 2, Floor: 0, CompletedFloor: 1, BuildStatus: 1, BuilderPerc: 80, CustomerPerc: 20, Customer: "customer.202@example.com"},
+		SmartHome{Name: "203", Tower: 2, Floor: 0, CompletedFloor: 1, BuildStatus: 1, BuilderPerc: 80, CustomerPerc: 20, Customer: "customer.203@example.com"},
+		SmartHome{Name: "204", Tower: 2, Floor: 0, CompletedFloor: 1, BuildStatus: 1, BuilderPerc: 80, CustomerPerc: 20, Customer: "customer.204@example.com"},
 	}
 
 	i := 0
 	for i < len(homes) {
 		fmt.Println("i is ", i)
-		homeAsBytes, _ := json.Marshal(homes[i])
+		homeAsBytes, err := json.Marshal(homes[i])
+		if err != nil {
+			fmt.Println("error while converting ", err.Error())
+			return shim.Error(err.Error())
+		}
 		APIstub.PutState("HOME"+strconv.Itoa(i), homeAsBytes)
 		fmt.Println("Added", homes[i])
 		i = i + 1
@@ -128,7 +132,7 @@ func (s *SmartHome) createHome(APIstub shim.ChaincodeStubInterface, args []strin
 
   iTower, _ := strconv.Atoi(args[2])
 	iFloor, _ := strconv.Atoi(args[3])
-	var home = SmartHome{name: args[1], tower: iTower, floor: iFloor, completedFloor: 0, buildStatus: 0, builderPerc: 100, customerPerc: 0, customer: args[4]}
+	var home = SmartHome{Name: args[1], Tower: iTower, Floor: iFloor, CompletedFloor: 0, BuildStatus: 0, BuilderPerc: 100, CustomerPerc: 0, Customer: args[4]}
 
 	homeAsBytes, _ := json.Marshal(home)
 	APIstub.PutState(args[0], homeAsBytes)
@@ -138,8 +142,8 @@ func (s *SmartHome) createHome(APIstub shim.ChaincodeStubInterface, args []strin
 
 func (s *SmartHome) queryAllHomes(APIstub shim.ChaincodeStubInterface) sc.Response {
 
-	startKey := "0"
-	endKey := "999"
+	startKey := "HOME0"
+	endKey := "HOME999"
 
 	resultsIterator, err := APIstub.GetStateByRange(startKey, endKey)
 	if err != nil {
@@ -189,8 +193,8 @@ func (s *SmartHome) changeHomeOwnership(APIstub shim.ChaincodeStubInterface, arg
 	home := SmartHome{}
 
 	json.Unmarshal(homeAsBytes, &home)
-	home.builderPerc, _ = strconv.Atoi(args[1])
-	home.customerPerc, _ = strconv.Atoi(args[2])
+	home.BuilderPerc, _ = strconv.Atoi(args[1])
+	home.CustomerPerc, _ = strconv.Atoi(args[2])
 
 	homeAsBytes, _ = json.Marshal(home)
 	APIstub.PutState(args[0], homeAsBytes)
