@@ -42,11 +42,6 @@ type QueryResults struct {
 func checkInvoke(t *testing.T, stub *shim.MockStub, args [][]byte) sc.Response{
 
 	res := stub.MockInvoke("1",args)
-	if res.Status != shim.OK {
-		fmt.Println("Invoke", args, "failed", string(res.Message))
-		t.FailNow()
-	}
-
 	return res
 }
 
@@ -80,7 +75,7 @@ func TestQueryHome(t *testing.T) {
 	stub := shim.NewMockStub("ex01",scc)
 
 	checkInvoke(t, stub, [][]byte{[]byte("initLedger")})
-	checkHome(t, stub, "HOME0", "101")
+	checkHome(t, stub, "101", "101")
 
 }
 
@@ -89,8 +84,8 @@ func TestCreateHome(t *testing.T) {
 	scc := new(SmartHome)
 	stub := shim.NewMockStub("ex01",scc)
 
-	checkInvoke(t, stub, [][]byte{[]byte("createHome"), []byte("TESTHOME"), []byte("301"), []byte("3"), []byte("0"), []byte("customer.301@example.com")})
-	checkHome(t, stub, "TESTHOME", "301")
+	checkInvoke(t, stub, [][]byte{[]byte("createHome"), []byte("301"), []byte("C"), []byte("1")})
+	checkHome(t, stub, "301", "301")
 
 }
 
@@ -125,17 +120,91 @@ func TestChangeHomeOwnership(t *testing.T) {
 
 	scc := new(SmartHome)
 	stub := shim.NewMockStub("ex01",scc)
+  checkInvoke(t, stub, [][]byte{[]byte("initLedger")})
+	checkInvoke(t, stub, [][]byte{[]byte("changeHomeOwnership"), []byte("104"), []byte("Test.Customer@example.com")})
+	res := checkInvoke(t, stub, [][]byte{[]byte("queryHome"), []byte("104")})
 
-	checkInvoke(t, stub, [][]byte{[]byte("changeHomeOwnership"), []byte("HOME0"), []byte("80"), []byte("20")})
-	res := checkInvoke(t, stub, [][]byte{[]byte("queryHome"), []byte("HOME0")})
+	if res.Status != shim.OK {
+		fmt.Println("Query Home failed", string(res.Message))
+		t.FailNow()
+	}
 
 	homeAsBytes := res.Payload
 	home := SmartHome{}
 
 	json.Unmarshal(homeAsBytes, &home)
 
-	if home.BuilderPerc != 80 {
-		fmt.Println("Incorrect percentage ")
+	if home.Customer != "Test.Customer@example.com" {
+		fmt.Println("Incorrect customer ")
+		t.FailNow()
+	}
+}
+
+func TestNotifyFloorCompletion(t *testing.T) {
+
+	scc := new(SmartHome)
+	stub := shim.NewMockStub("ex01",scc)
+
+	checkInvoke(t, stub, [][]byte{[]byte("initLedger")})
+	checkInvoke(t, stub, [][]byte{[]byte("notifyFloorCompletion"), []byte("C"),[]byte("5")})
+	towerAsBytes,_ := stub.GetState("C")
+	tower := Tower{}
+
+	json.Unmarshal(towerAsBytes, &tower)
+
+	if tower.BuildStatus != "COM" {
+		fmt.Println("Incorrect status ")
+		t.FailNow()
+	}
+}
+
+func TestVerifyFloorCompletion(t *testing.T) {
+
+	scc := new(SmartHome)
+	stub := shim.NewMockStub("ex01",scc)
+
+	checkInvoke(t, stub, [][]byte{[]byte("initLedger")})
+	checkInvoke(t, stub, [][]byte{[]byte("verifyFloorCompletion"), []byte("C"),[]byte("5"),[]byte("OK")})
+
+	keyname := "tower~floor~bank"
+	key,err := stub.CreateCompositeKey(keyname, []string{"C","5","bank1"})
+	if err != nil {
+		fmt.Println("Error forming composite key")
+		t.FailNow()
+	}
+
+	endorsementAsBytes,_ := stub.GetState(key)
+
+	fmt.Println(string(endorsementAsBytes))
+	if string(endorsementAsBytes) != "OK" {
+		fmt.Println("Couldn't verify status ")
+		t.FailNow()
+	}
+}
+
+func TestObtainCompletionVerification(t *testing.T) {
+	scc := new(SmartHome)
+	stub := shim.NewMockStub("ex01",scc)
+
+	checkInvoke(t, stub, [][]byte{[]byte("initLedger")})
+  checkInvoke(t, stub, [][]byte{[]byte("notifyFloorCompletion"), []byte("C"),[]byte("5")})
+	checkInvoke(t, stub, [][]byte{[]byte("verifyFloorCompletion"), []byte("C"),[]byte("5"),[]byte("OK")})
+	checkInvoke(t, stub, [][]byte{[]byte("obtainCompletionVerification"), []byte("C"),[]byte("5")})
+	towerAsBytes,_ := stub.GetState("C")
+	tower := Tower{}
+
+	json.Unmarshal(towerAsBytes, &tower)
+
+	if tower.BuildStatus != "VER" {
+		fmt.Println("Invalid status expecting verified")
+		t.FailNow()
+	}
+  checkInvoke(t, stub, [][]byte{[]byte("notifyFloorCompletion"), []byte("C"),[]byte("6")})
+	checkInvoke(t, stub, [][]byte{[]byte("verifyFloorCompletion"), []byte("C"),[]byte("6"),[]byte("NOK")})
+	res := checkInvoke(t, stub, [][]byte{[]byte("obtainCompletionVerification"), []byte("C"),[]byte("6")})
+
+	if res.Status == shim.OK {
+		fmt.Println("Invalid verify status")
 		t.FailNow()
 	}
 }
