@@ -24,30 +24,29 @@
 
 package main
 
-
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
-	"encoding/json"
 
 	"github.com/hyperledger/fabric/core/chaincode/shim"
-	 sc "github.com/hyperledger/fabric/protos/peer"
+	sc "github.com/hyperledger/fabric/protos/peer"
 )
 
 type QueryResults struct {
-		Key string
-		Record SmartHome
+	Key    string
+	Record SmartHome
 }
 
-func checkInvoke(t *testing.T, stub *shim.MockStub, args [][]byte) sc.Response{
+func checkInvoke(t *testing.T, stub *shim.MockStub, args [][]byte) sc.Response {
 
-	res := stub.MockInvoke("1",args)
+	res := stub.MockInvoke("1", args)
 	return res
 }
 
-func checkHome(t *testing.T, stub *shim.MockStub, id string, name string ) {
+func checkHome(t *testing.T, stub *shim.MockStub, id string, name string) {
 
-	res := stub.MockInvoke("1",[][]byte{[]byte("queryHome"), []byte(id)})
+	res := stub.MockInvoke("1", [][]byte{[]byte("queryHome"), []byte(id)})
 	if res.Status != shim.OK {
 		fmt.Println("QueryHome", id, "failed", string(res.Message))
 		t.FailNow()
@@ -57,7 +56,7 @@ func checkHome(t *testing.T, stub *shim.MockStub, id string, name string ) {
 		t.FailNow()
 	}
 
-  homeAsBytes := res.Payload
+	homeAsBytes := res.Payload
 	home := SmartHome{}
 
 	json.Unmarshal(homeAsBytes, &home)
@@ -72,7 +71,7 @@ func checkHome(t *testing.T, stub *shim.MockStub, id string, name string ) {
 func TestQueryHome(t *testing.T) {
 
 	scc := new(SmartHome)
-	stub := shim.NewMockStub("ex01",scc)
+	stub := shim.NewMockStub("ex01", scc)
 
 	checkInvoke(t, stub, [][]byte{[]byte("initLedger")})
 	checkHome(t, stub, "101", "101")
@@ -82,7 +81,7 @@ func TestQueryHome(t *testing.T) {
 func TestCreateHome(t *testing.T) {
 
 	scc := new(SmartHome)
-	stub := shim.NewMockStub("ex01",scc)
+	stub := shim.NewMockStub("ex01", scc)
 
 	checkInvoke(t, stub, [][]byte{[]byte("createHome"), []byte("301"), []byte("C"), []byte("1")})
 	checkHome(t, stub, "301", "301")
@@ -92,14 +91,14 @@ func TestCreateHome(t *testing.T) {
 func TestQueryAllHomes(t *testing.T) {
 
 	scc := new(SmartHome)
-	stub := shim.NewMockStub("ex01",scc)
-  allhomesbytes :=make([]QueryResults,0)
-  checkInvoke(t, stub, [][]byte{[]byte("initLedger")})
-	all_homes:=checkInvoke(t, stub, [][]byte{[]byte("queryAllHomes")})
+	stub := shim.NewMockStub("ex01", scc)
+	allhomesbytes := make([]QueryResults, 0)
+	checkInvoke(t, stub, [][]byte{[]byte("initLedger")})
+	all_homes := checkInvoke(t, stub, [][]byte{[]byte("queryAllHomes")})
 	fmt.Sprintf("Return payload is %s ", all_homes.Payload)
 	json.Unmarshal(all_homes.Payload, &allhomesbytes)
 
-  num_of_homes := len(allhomesbytes)
+	num_of_homes := len(allhomesbytes)
 	fmt.Println("Number of records Found ", num_of_homes)
 	if num_of_homes < 8 {
 		fmt.Println("Expected more number of rows")
@@ -116,11 +115,38 @@ func TestQueryAllHomes(t *testing.T) {
 	}
 }
 
+func TestQueryAllTowers(t *testing.T) {
+
+	scc := new(SmartHome)
+	stub := shim.NewMockStub("ex01", scc)
+	alltowersbytes := make([]QueryResults, 0)
+	checkInvoke(t, stub, [][]byte{[]byte("initLedger")})
+	all_towers := checkInvoke(t, stub, [][]byte{[]byte("queryAllTowers")})
+	fmt.Println("Return payload is", all_towers.Payload)
+	json.Unmarshal(all_towers.Payload, &alltowersbytes)
+
+	num_of_towers := len(alltowersbytes)
+	fmt.Println("Number of records Found ", num_of_towers)
+	if num_of_towers < 3 {
+		fmt.Println("Expected more number of rows")
+		t.FailNow()
+	}
+
+	i := 0
+	//allhomes := make([]SmartHome,num_of_homes)
+	for i < num_of_towers {
+		fmt.Println("Key val ", alltowersbytes[i].Key)
+		//json.Unmarshal(allhomesbytes[i].Record,&allhomes[i])
+		fmt.Println("Found ", alltowersbytes[i].Record)
+		i = i + 1
+	}
+}
+
 func TestChangeHomeOwnership(t *testing.T) {
 
 	scc := new(SmartHome)
-	stub := shim.NewMockStub("ex01",scc)
-  checkInvoke(t, stub, [][]byte{[]byte("initLedger")})
+	stub := shim.NewMockStub("ex01", scc)
+	checkInvoke(t, stub, [][]byte{[]byte("initLedger")})
 	checkInvoke(t, stub, [][]byte{[]byte("changeHomeOwnership"), []byte("104"), []byte("Test.Customer@example.com")})
 	res := checkInvoke(t, stub, [][]byte{[]byte("queryHome"), []byte("104")})
 
@@ -143,11 +169,11 @@ func TestChangeHomeOwnership(t *testing.T) {
 func TestNotifyFloorCompletion(t *testing.T) {
 
 	scc := new(SmartHome)
-	stub := shim.NewMockStub("ex01",scc)
+	stub := shim.NewMockStub("ex01", scc)
 
 	checkInvoke(t, stub, [][]byte{[]byte("initLedger")})
-	checkInvoke(t, stub, [][]byte{[]byte("notifyFloorCompletion"), []byte("C"),[]byte("5")})
-	towerAsBytes,_ := stub.GetState("C")
+	checkInvoke(t, stub, [][]byte{[]byte("notifyFloorCompletion"), []byte("C"), []byte("5")})
+	towerAsBytes, _ := stub.GetState("C")
 	tower := Tower{}
 
 	json.Unmarshal(towerAsBytes, &tower)
@@ -161,19 +187,19 @@ func TestNotifyFloorCompletion(t *testing.T) {
 func TestVerifyFloorCompletion(t *testing.T) {
 
 	scc := new(SmartHome)
-	stub := shim.NewMockStub("ex01",scc)
+	stub := shim.NewMockStub("ex01", scc)
 
 	checkInvoke(t, stub, [][]byte{[]byte("initLedger")})
-	checkInvoke(t, stub, [][]byte{[]byte("verifyFloorCompletion"), []byte("C"),[]byte("5"),[]byte("OK")})
+	checkInvoke(t, stub, [][]byte{[]byte("verifyFloorCompletion"), []byte("C"), []byte("5"), []byte("OK")})
 
 	keyname := "tower~floor~bank"
-	key,err := stub.CreateCompositeKey(keyname, []string{"C","5","bank1"})
+	key, err := stub.CreateCompositeKey(keyname, []string{"C", "5", "bank1"})
 	if err != nil {
 		fmt.Println("Error forming composite key")
 		t.FailNow()
 	}
 
-	endorsementAsBytes,_ := stub.GetState(key)
+	endorsementAsBytes, _ := stub.GetState(key)
 
 	fmt.Println(string(endorsementAsBytes))
 	if string(endorsementAsBytes) != "OK" {
@@ -184,13 +210,13 @@ func TestVerifyFloorCompletion(t *testing.T) {
 
 func TestObtainCompletionVerification(t *testing.T) {
 	scc := new(SmartHome)
-	stub := shim.NewMockStub("ex01",scc)
+	stub := shim.NewMockStub("ex01", scc)
 
 	checkInvoke(t, stub, [][]byte{[]byte("initLedger")})
-  checkInvoke(t, stub, [][]byte{[]byte("notifyFloorCompletion"), []byte("C"),[]byte("5")})
-	checkInvoke(t, stub, [][]byte{[]byte("verifyFloorCompletion"), []byte("C"),[]byte("5"),[]byte("OK")})
-	checkInvoke(t, stub, [][]byte{[]byte("obtainCompletionVerification"), []byte("C"),[]byte("5")})
-	towerAsBytes,_ := stub.GetState("C")
+	checkInvoke(t, stub, [][]byte{[]byte("notifyFloorCompletion"), []byte("C"), []byte("5")})
+	checkInvoke(t, stub, [][]byte{[]byte("verifyFloorCompletion"), []byte("C"), []byte("5"), []byte("OK")})
+	checkInvoke(t, stub, [][]byte{[]byte("obtainCompletionVerification"), []byte("C"), []byte("5")})
+	towerAsBytes, _ := stub.GetState("C")
 	tower := Tower{}
 
 	json.Unmarshal(towerAsBytes, &tower)
@@ -199,9 +225,9 @@ func TestObtainCompletionVerification(t *testing.T) {
 		fmt.Println("Invalid status expecting verified")
 		t.FailNow()
 	}
-  checkInvoke(t, stub, [][]byte{[]byte("notifyFloorCompletion"), []byte("C"),[]byte("6")})
-	checkInvoke(t, stub, [][]byte{[]byte("verifyFloorCompletion"), []byte("C"),[]byte("6"),[]byte("NOK")})
-	res := checkInvoke(t, stub, [][]byte{[]byte("obtainCompletionVerification"), []byte("C"),[]byte("6")})
+	checkInvoke(t, stub, [][]byte{[]byte("notifyFloorCompletion"), []byte("C"), []byte("6")})
+	checkInvoke(t, stub, [][]byte{[]byte("verifyFloorCompletion"), []byte("C"), []byte("6"), []byte("NOK")})
+	res := checkInvoke(t, stub, [][]byte{[]byte("obtainCompletionVerification"), []byte("C"), []byte("6")})
 
 	if res.Status == shim.OK {
 		fmt.Println("Invalid verify status")

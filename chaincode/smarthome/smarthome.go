@@ -45,28 +45,28 @@ type SmartContract struct {
 
 // Define the SmartHome structure, with 4 properties.  Structure tags are used by encoding/json library
 type SmartHome struct {
-		Name   string `json:"name"`
-    Tower  string `json:"tower"`
-    Floor int `json:"floor"`
-		BuildStatus	string	`json:"buildStatus"`
-		BuilderPerc	int	`json:"builderPerc"`
-		CustomerPerc	int	`json:"customerPerc"`
-		Customer	string	`json:"customer"`
+	Name         string `json:"name"`
+	Tower        string `json:"tower"`
+	Floor        int    `json:"floor"`
+	BuildStatus  string `json:"buildStatus"`
+	BuilderPerc  int    `json:"builderPerc"`
+	CustomerPerc int    `json:"customerPerc"`
+	Customer     string `json:"customer"`
 }
 
 // Define the SmartHome structure, with 4 properties.  Structure tags are used by encoding/json library
 type Tower struct {
-    Id  string `json:"id"`
-    CompletedFloor  int `json:"completedFloor"`
-		BuildStatus	string	`json:"buildStatus"`
+	Id             string `json:"id"`
+	CompletedFloor int    `json:"completedFloor"`
+	BuildStatus    string `json:"buildStatus"`
 }
 
 // Define the SmartHome structure, with 4 properties.  Structure tags are used by encoding/json library
 type Endorsement struct {
-    Tower  string `json:"id"`
-    CompletedFloor  int `json:"completedFloor"`
-		Bank	int	`json:"bank"`
-		Status string `json:"status"`
+	Tower          string `json:"id"`
+	CompletedFloor int    `json:"completedFloor"`
+	Bank           int    `json:"bank"`
+	Status         string `json:"status"`
 }
 
 /*
@@ -102,6 +102,8 @@ func (s *SmartHome) Invoke(APIstub shim.ChaincodeStubInterface) sc.Response {
 		return s.verifyFloorCompletion(APIstub, args)
 	} else if function == "obtainCompletionVerification" {
 		return s.obtainCompletionVerification(APIstub, args)
+	} else if function == "queryAllTowers" {
+		return s.queryAllTowers(APIstub)
 	}
 
 	return shim.Error("Invalid Smart Contract function name.")
@@ -148,13 +150,13 @@ func (s *SmartHome) initLedger(APIstub shim.ChaincodeStubInterface) sc.Response 
 		i = i + 1
 	}
 
-	j:=0
+	j := 0
 	for j < len(towers) {
 		fmt.Println("j is ", j)
 		towerAsBytes, err := json.Marshal(towers[j])
 		if err != nil {
-				fmt.Println("error while converting tower ", err.Error())
-				return shim.Error(err.Error())
+			fmt.Println("error while converting tower ", err.Error())
+			return shim.Error(err.Error())
 		}
 		APIstub.PutState(towers[j].Id, towerAsBytes)
 		fmt.Println("Added Tower", towers[j].Id)
@@ -240,6 +242,49 @@ func (s *SmartHome) changeHomeOwnership(APIstub shim.ChaincodeStubInterface, arg
 	return shim.Success(nil)
 }
 
+func (s *SmartHome) queryAllTowers(APIstub shim.ChaincodeStubInterface) sc.Response {
+
+	startKey := "A"
+	endKey := "Z"
+
+	resultsIterator, err := APIstub.GetStateByRange(startKey, endKey)
+	if err != nil {
+		return shim.Error(err.Error())
+	}
+	defer resultsIterator.Close()
+
+	// buffer is a JSON array containing QueryResults
+	var buffer bytes.Buffer
+	buffer.WriteString("[")
+
+	bArrayMemberAlreadyWritten := false
+	for resultsIterator.HasNext() {
+		queryResponse, err := resultsIterator.Next()
+		if err != nil {
+			return shim.Error(err.Error())
+		}
+		// Add a comma before array members, suppress it for the first array member
+		if bArrayMemberAlreadyWritten == true {
+			buffer.WriteString(",")
+		}
+		buffer.WriteString("{\"Key\":")
+		buffer.WriteString("\"")
+		buffer.WriteString(queryResponse.Key)
+		buffer.WriteString("\"")
+
+		buffer.WriteString(", \"Record\":")
+		// Record is a JSON object, so we write as-is
+		buffer.WriteString(string(queryResponse.Value))
+		buffer.WriteString("}")
+		bArrayMemberAlreadyWritten = true
+	}
+	buffer.WriteString("]")
+
+	fmt.Printf("- queryAllTowers:\n%s\n", buffer.String())
+
+	return shim.Success(buffer.Bytes())
+}
+
 func (s *SmartHome) notifyFloorCompletion(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
 	if len(args) != 2 {
 		return shim.Error("Incorrect number of arguments. Expecting 3")
@@ -248,10 +293,10 @@ func (s *SmartHome) notifyFloorCompletion(APIstub shim.ChaincodeStubInterface, a
 	tower := Tower{}
 	json.Unmarshal(towerAsBytes, &tower)
 
-  tower.CompletedFloor,_ = strconv.Atoi(args[1])
+	tower.CompletedFloor, _ = strconv.Atoi(args[1])
 	tower.BuildStatus = "COM"
 	towerAsBytes, _ = json.Marshal(tower)
-  APIstub.PutState(args[0], towerAsBytes)
+	APIstub.PutState(args[0], towerAsBytes)
 	return shim.Success(nil)
 }
 
@@ -260,24 +305,23 @@ func (s *SmartHome) verifyFloorCompletion(APIstub shim.ChaincodeStubInterface, a
 		return shim.Error("Incorrect number of arguments. Expecting 3")
 	}
 	keyname := "tower~floor~bank"
-	key,err := APIstub.CreateCompositeKey(keyname, []string{args[0],args[1],"bank1"})
+	key, err := APIstub.CreateCompositeKey(keyname, []string{args[0], args[1], "bank1"})
 	if err != nil {
 		fmt.Println("Error forming composite key")
 		return shim.Error(err.Error())
 	}
 
-	fmt.Println("composite key",key)
+	fmt.Println("composite key", key)
 	APIstub.PutState(key, []byte(args[2]))
 	return shim.Success(nil)
 }
-
 
 func (s *SmartHome) obtainCompletionVerification(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
 	if len(args) != 2 {
 		return shim.Error("Incorrect number of arguments. Expecting 3")
 	}
 	keyname := "tower~floor~bank"
-	key,err := APIstub.CreateCompositeKey(keyname, []string{args[0],args[1],"bank1"})
+	key, err := APIstub.CreateCompositeKey(keyname, []string{args[0], args[1], "bank1"})
 	if err != nil {
 		fmt.Println("Error forming composite key")
 		return shim.Error(err.Error())
@@ -286,7 +330,7 @@ func (s *SmartHome) obtainCompletionVerification(APIstub shim.ChaincodeStubInter
 	endorsement := string(endorsementStatusAsBytes)
 
 	if endorsement == "NOK" {
-		msg := strings.Join([]string{"Floor", args[1], "not completed "}," ")
+		msg := strings.Join([]string{"Floor", args[1], "not completed "}, " ")
 		return shim.Error(msg)
 	}
 
@@ -294,10 +338,10 @@ func (s *SmartHome) obtainCompletionVerification(APIstub shim.ChaincodeStubInter
 	tower := Tower{}
 	json.Unmarshal(towerAsBytes, &tower)
 
-  tower.CompletedFloor,_ = strconv.Atoi(args[1])
+	tower.CompletedFloor, _ = strconv.Atoi(args[1])
 	tower.BuildStatus = "VER"
 	towerAsBytes, _ = json.Marshal(tower)
-  APIstub.PutState(args[0], towerAsBytes)
+	APIstub.PutState(args[0], towerAsBytes)
 
 	startKey := "000"
 	endKey := "999"
@@ -317,8 +361,8 @@ func (s *SmartHome) obtainCompletionVerification(APIstub shim.ChaincodeStubInter
 		home := SmartHome{}
 		json.Unmarshal(queryResponse.Value, &home)
 		if home.Tower == args[0] {
-			home.BuildStatus = strings.Join([]string{"Floor", args[1], "Completed"}," ")
-			homeAsBytes,_ :=  json.Marshal(home)
+			home.BuildStatus = strings.Join([]string{"Floor", args[1], "Completed"}, " ")
+			homeAsBytes, _ := json.Marshal(home)
 			APIstub.PutState(home.Name, homeAsBytes)
 		}
 	}
