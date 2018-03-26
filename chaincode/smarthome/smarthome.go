@@ -49,6 +49,7 @@ type SmartHome struct {
 	Tower        string `json:"tower"`
 	Floor        int    `json:"floor"`
 	BuildStatus  string `json:"buildStatus"`
+	Status       string `json:"status"`
 	BuilderPerc  int    `json:"builderPerc"`
 	CustomerPerc int    `json:"customerPerc"`
 	Customer     string `json:"customer"`
@@ -104,6 +105,10 @@ func (s *SmartHome) Invoke(APIstub shim.ChaincodeStubInterface) sc.Response {
 		return s.obtainCompletionVerification(APIstub, args)
 	} else if function == "queryAllTowers" {
 		return s.queryAllTowers(APIstub)
+	} else if function == "transferHome" {
+		return s.transferHome(APIstub, args)
+	} else if function == "initiatePayment" {
+		return s.initiatePayment(APIstub, args)
 	}
 
 	return shim.Error("Invalid Smart Contract function name.")
@@ -121,14 +126,14 @@ func (s *SmartHome) queryHome(APIstub shim.ChaincodeStubInterface, args []string
 
 func (s *SmartHome) initLedger(APIstub shim.ChaincodeStubInterface) sc.Response {
 	homes := []SmartHome{
-		SmartHome{Name: "101", Tower: "A", Floor: 1, BuildStatus: "Booked", BuilderPerc: 100, CustomerPerc: 0, Customer: "customer.101@example.com"},
-		SmartHome{Name: "102", Tower: "A", Floor: 1, BuildStatus: "Booked", BuilderPerc: 100, CustomerPerc: 0, Customer: "customer.102@example.com"},
-		SmartHome{Name: "103", Tower: "A", Floor: 1, BuildStatus: "Booked", BuilderPerc: 100, CustomerPerc: 0, Customer: "customer.103@example.com"},
-		SmartHome{Name: "104", Tower: "A", Floor: 1, BuildStatus: "NotBooked", BuilderPerc: 100, CustomerPerc: 0, Customer: ""},
-		SmartHome{Name: "201", Tower: "B", Floor: 1, BuildStatus: "Booked", BuilderPerc: 80, CustomerPerc: 20, Customer: "customer.201@example.com"},
-		SmartHome{Name: "202", Tower: "B", Floor: 1, BuildStatus: "Booked", BuilderPerc: 80, CustomerPerc: 20, Customer: "customer.202@example.com"},
-		SmartHome{Name: "203", Tower: "B", Floor: 1, BuildStatus: "Booked", BuilderPerc: 80, CustomerPerc: 20, Customer: "customer.203@example.com"},
-		SmartHome{Name: "204", Tower: "B", Floor: 1, BuildStatus: "Booked", BuilderPerc: 80, CustomerPerc: 20, Customer: "customer.204@example.com"},
+		SmartHome{Name: "101", Tower: "A", Floor: 1, BuildStatus: "Not Started", Status: "Booked", BuilderPerc: 85, CustomerPerc: 15, Customer: "customer.101@example.com"},
+		SmartHome{Name: "102", Tower: "A", Floor: 1, BuildStatus: "Not Started", Status: "Booked", BuilderPerc: 85, CustomerPerc: 15, Customer: "customer.102@example.com"},
+		SmartHome{Name: "103", Tower: "A", Floor: 1, BuildStatus: "Not Started", Status: "Booked", BuilderPerc: 85, CustomerPerc: 15, Customer: "customer.103@example.com"},
+		SmartHome{Name: "104", Tower: "A", Floor: 1, BuildStatus: "Not Started", Status: "Not Booked", BuilderPerc: 100, CustomerPerc: 0, Customer: ""},
+		SmartHome{Name: "201", Tower: "B", Floor: 1, BuildStatus: "Not Started", Status: "Booked", BuilderPerc: 85, CustomerPerc: 15, Customer: "customer.201@example.com"},
+		SmartHome{Name: "202", Tower: "B", Floor: 1, BuildStatus: "Not Started", Status: "Booked", BuilderPerc: 85, CustomerPerc: 15, Customer: "customer.202@example.com"},
+		SmartHome{Name: "203", Tower: "B", Floor: 1, BuildStatus: "Not Started", Status: "Booked", BuilderPerc: 85, CustomerPerc: 15, Customer: "customer.203@example.com"},
+		SmartHome{Name: "204", Tower: "B", Floor: 1, BuildStatus: "Not Started", Status: "Booked", BuilderPerc: 85, CustomerPerc: 15, Customer: "customer.204@example.com"},
 	}
 
 	towers := []Tower{
@@ -139,27 +144,26 @@ func (s *SmartHome) initLedger(APIstub shim.ChaincodeStubInterface) sc.Response 
 
 	i := 0
 	for i < len(homes) {
-		fmt.Println("i is ", i)
 		homeAsBytes, err := json.Marshal(homes[i])
 		if err != nil {
 			fmt.Println("error while converting home", err.Error())
 			return shim.Error(err.Error())
 		}
 		APIstub.PutState(homes[i].Name, homeAsBytes)
-		fmt.Println("Added Home", homes[i].Name)
+		//fmt.Println("Added Home", homes[i].Name)
 		i = i + 1
 	}
 
 	j := 0
 	for j < len(towers) {
-		fmt.Println("j is ", j)
+		//fmt.Println("j is ", j)
 		towerAsBytes, err := json.Marshal(towers[j])
 		if err != nil {
 			fmt.Println("error while converting tower ", err.Error())
 			return shim.Error(err.Error())
 		}
 		APIstub.PutState(towers[j].Id, towerAsBytes)
-		fmt.Println("Added Tower", towers[j].Id)
+		//fmt.Println("Added Tower", towers[j].Id)
 		j = j + 1
 	}
 
@@ -173,7 +177,7 @@ func (s *SmartHome) createHome(APIstub shim.ChaincodeStubInterface, args []strin
 	}
 
 	iFloor, _ := strconv.Atoi(args[2])
-	var home = SmartHome{Name: args[0], Tower: args[1], Floor: iFloor, BuildStatus: "NotBooked", BuilderPerc: 100, CustomerPerc: 0, Customer: ""}
+	var home = SmartHome{Name: args[0], Tower: args[1], Floor: iFloor, BuildStatus: "NotStarted", Status: "NotBooked", BuilderPerc: 100, CustomerPerc: 0, Customer: ""}
 
 	homeAsBytes, _ := json.Marshal(home)
 	APIstub.PutState(args[0], homeAsBytes)
@@ -224,6 +228,26 @@ func (s *SmartHome) queryAllHomes(APIstub shim.ChaincodeStubInterface) sc.Respon
 	return shim.Success(buffer.Bytes())
 }
 
+func (s *SmartHome) transferHome(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
+
+	if len(args) != 2 {
+		return shim.Error("Incorrect number of arguments. Expecting 2")
+	}
+
+	homeAsBytes, _ := APIstub.GetState(args[0])
+	home := SmartHome{}
+
+	json.Unmarshal(homeAsBytes, &home)
+	home.Customer = args[1]
+	home.Status = "Booked"
+	home.BuilderPerc = 85
+	home.CustomerPerc = 15
+	homeAsBytes, _ = json.Marshal(home)
+	APIstub.PutState(args[0], homeAsBytes)
+
+	return shim.Success(nil)
+}
+
 func (s *SmartHome) changeHomeOwnership(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
 
 	if len(args) != 2 {
@@ -235,7 +259,6 @@ func (s *SmartHome) changeHomeOwnership(APIstub shim.ChaincodeStubInterface, arg
 
 	json.Unmarshal(homeAsBytes, &home)
 	home.Customer = args[1]
-	home.BuildStatus = "Booked"
 	homeAsBytes, _ = json.Marshal(home)
 	APIstub.PutState(args[0], homeAsBytes)
 
@@ -311,8 +334,31 @@ func (s *SmartHome) verifyFloorCompletion(APIstub shim.ChaincodeStubInterface, a
 		return shim.Error(err.Error())
 	}
 
-	fmt.Println("composite key", key)
+	//fmt.Println("composite key", key)
 	APIstub.PutState(key, []byte(args[2]))
+	return shim.Success(nil)
+}
+
+func (s *SmartHome) initiatePayment(APIstub shim.ChaincodeStubInterface, args []string) sc.Response {
+	if len(args) != 1 {
+		return shim.Error("Incorrect number of arguments. Expecting 1")
+	}
+	homeAsBytes, _ := APIstub.GetState(args[0])
+	home := SmartHome{}
+
+	json.Unmarshal(homeAsBytes, &home)
+
+	towerAsBytes, _ := APIstub.GetState(home.Tower)
+	tower := Tower{}
+	json.Unmarshal(towerAsBytes, &tower)
+	if !strings.Contains(home.BuildStatus, "Completed") {
+		return shim.Error("Completion status not verified")
+	}
+
+	home.BuildStatus = strings.Join([]string{"Floor", strconv.Itoa(tower.CompletedFloor), "payment initiated"}, " ")
+	homeAsBytes, _ = json.Marshal(home)
+	APIstub.PutState(home.Name, homeAsBytes)
+
 	return shim.Success(nil)
 }
 
